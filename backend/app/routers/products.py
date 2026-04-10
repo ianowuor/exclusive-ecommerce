@@ -11,13 +11,13 @@ from app.models.product import Product
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 # Import your new service
-from app.services.shopify import sync_product_to_shopify, update_shopify_product, delete_shopify_product
+from app.services.shopify import sync_product_to_shopify, update_shopify_product, delete_shopify_product, update_shopify_product_image
 
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 async def create_product(
     payload: ProductCreate,
@@ -46,8 +46,15 @@ async def create_product(
         
         if isinstance(shopify_result, str) and shopify_result.startswith("gid://"):
             product.shopify_id = shopify_result
-            db.add(product)
-            db.commit()
+            db.commit() # Save the GID first
+
+            # 3. Image Sync (If URL provided)
+            if product.image_url:
+                await update_shopify_product_image(
+                    shopify_id=product.shopify_id,
+                    image_url=product.image_url
+                )
+            
             db.refresh(product)
             
     except Exception as e:
@@ -89,20 +96,23 @@ async def update_product(
     # 3. If the product is linked to Shopify, push the changes
     if db_product.shopify_id:
         try:
-            shopify_response = await update_shopify_product(
+            # Update basic info
+            await update_shopify_product(
                 shopify_id=db_product.shopify_id,
                 name=db_product.name,
                 description=db_product.description,
-                price=db_product.price
+                price=float(db_product.price)
             )
             
-            # Check for Shopify-specific errors
-            if shopify_response.get("data", {}).get("productUpdate", {}).get("userErrors"):
-                logger.error(f"Shopify Sync Error: {shopify_response['data']['productUpdate']['userErrors']}")
+            # Update image if it was part of this request
+            if "image_url" in update_data and db_product.image_url:
+                await update_shopify_product_image(
+                    shopify_id=db_product.shopify_id,
+                    image_url=db_product.image_url
+                )
+
         except Exception as e:
             logger.error(f"Failed to sync update to Shopify: {str(e)}")
-            # We don't raise an error here because the local save was successful,
-            # but in production, you'd mark this for a retry.
 
     return db_product
 

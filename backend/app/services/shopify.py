@@ -140,3 +140,34 @@ async def delete_shopify_product(shopify_id: str):
     """
     variables = {"input": {"id": shopify_id}}
     return await shopify_graphql(mutation, variables)
+
+
+async def update_shopify_product_image(shopify_id: str, image_url: str):
+    """
+    Uploads an image from a URL to Shopify and attaches it to the product.
+    """
+    mutation = """
+    mutation productCreateMedia($media: [CreateMediaInput!]!, $productId: ID!) {
+      productCreateMedia(media: $media, productId: $productId) {
+        media {
+          id
+          status
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    """
+    variables = {
+        "productId": shopify_id,
+        "media": [
+            {
+                "alt": "Product Image",
+                "mediaContentType": "IMAGE",
+                "originalSource": image_url
+            }
+        ]
+    }
+    return await shopify_graphql(mutation, variables)
