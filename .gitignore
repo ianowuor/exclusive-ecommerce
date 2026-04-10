@@ -1,0 +1,34 @@
+# Project specific
+frontend/
+.DS_Store
+.env                 <-- CRITICAL: Keeps your Shopify tokens secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+env/
+venv/
+ENV/
+
+# Docker
+.docker/
+*.log
+
+# Backend
+backend/.venv/
+backend/.env         # Backup in case you keep a copy inside the backend folder
+
+# Local uploads and DBs
+backend/uploads/
+backend/uploads-test/
+backend/test_backend.db
+*.db
+*.sqlite3
+
+# Environment specific
+.python-version
+.vscode/
+.idea/

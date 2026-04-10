@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: exclusive_ecommerce_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: exclusive_ecommerce
+    ports:
+      - "5442:5432" # Changed host port to 5442, but container remains 5432
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    image: python:3.12-slim
+    container_name: exclusive_ecommerce_backend
+    working_dir: /app
+    depends_on:
+      - db
+    # --- KEY CHANGE: Load all variables from your .env file ---
+    env_file:
+      - .env
+    environment:
+      # These stay here as they define the connection between services
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/exclusive_ecommerce
+      # Other overrides can go here if needed
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "pip install -r requirements.txt
+      && alembic upgrade head
+      && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  db_data:

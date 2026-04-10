@@ -1,0 +1,26 @@
+fastapi
+uvicorn[standard]
+
+# ORM / DB
+SQLAlchemy>=2.0
+psycopg[binary]
+alembic
+
+# Auth / security
+python-jose[cryptography]
+bcrypt
+
+# Data validation / settings
+pydantic
+pydantic-settings
+
+# (Often needed once you add file upload endpoints)
+python-multipart
+
+# Email type validation for Pydantic
+email-validator
+
+# Testing
+pytest
+httpx
+
