@@ -16,6 +16,7 @@ def verify_shopify_webhook(data: bytes, hmac_header: str) -> bool:
     Verifies the integrity of the webhook using the Shopify API Secret.
     """
     if not hmac_header:
+        logger.warning("Webhook rejected: Missing HMAC header")
         return False
         
     hash_code = hmac.new(
@@ -69,4 +70,29 @@ async def shopify_product_update_webhook(
     else:
         logger.info(f"Product with Shopify ID {shopify_id} not found in local DB. Skipping.")
 
+    return {"status": "success"}
+
+
+@router.post("/shopify/product-delete")
+async def shopify_product_delete_webhook(
+    request: Request,
+    db: Session = Depends(get_db),
+    x_shopify_hmac_sha256: str = Header(None)
+):
+    raw_body = await request.body()
+    if not verify_shopify_webhook(raw_body, x_shopify_hmac_sha256):
+        raise HTTPException(status_code=401, detail="Invalid HMAC")
+
+    data = json.loads(raw_body)
+    shopify_id = f"gid://shopify/Product/{data.get('id')}"
+
+    product = db.query(Product).filter(Product.shopify_id == shopify_id).first()
+    
+    if not product:
+        # If it's already gone, just tell Shopify "Success" so it stops retrying
+        logger.info(f"Webhook received for {shopify_id}, but product already deleted locally.")
+        return {"status": "already_deleted"}
+
+    db.delete(product)
+    db.commit()
     return {"status": "success"}

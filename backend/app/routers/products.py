@@ -11,7 +11,7 @@ from app.models.product import Product
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 # Import your new service
-from app.services.shopify import sync_product_to_shopify, update_shopify_product
+from app.services.shopify import sync_product_to_shopify, update_shopify_product, delete_shopify_product
 
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -105,3 +105,30 @@ async def update_product(
             # but in production, you'd mark this for a retry.
 
     return db_product
+
+
+@router.delete("/{product_id}", status_code=204)
+async def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Fetch product
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # 2. Sync deletion to Shopify if linked
+    if product.shopify_id:
+        try:
+            response = await delete_shopify_product(product.shopify_id)
+            errors = response.get("data", {}).get("productDelete", {}).get("userErrors")
+            if errors:
+                logger.error(f"Shopify Delete Error: {errors}")
+        except Exception as e:
+            logger.error(f"Network error during Shopify deletion: {e}")
+
+    # 3. Remove from local DB
+    db.delete(product)
+    db.commit()
+    return None

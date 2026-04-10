@@ -123,3 +123,20 @@ async def update_shopify_product(shopify_id: str, name: str, description: str, p
     }
 
     return await shopify_graphql(mutation, variables)
+
+
+async def delete_shopify_product(shopify_id: str):
+    """Deletes a product from Shopify using its GID."""
+    mutation = """
+    mutation productDelete($input: ProductDeleteInput!) {
+      productDelete(input: $input) {
+        deletedProductId
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    """
+    variables = {"input": {"id": shopify_id}}
+    return await shopify_graphql(mutation, variables)
