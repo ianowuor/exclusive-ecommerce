@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     SHOPIFY_STORE_URL: str
     SHOPIFY_ACCESS_TOKEN: str
+    SHOPIFY_API_SECRET: str
     SHOPIFY_LOCATION_ID: str
     SHOPIFY_API_VERSION: str = "2025-01"
 

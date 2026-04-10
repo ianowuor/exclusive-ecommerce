@@ -14,13 +14,23 @@ class ProductCreate(ProductBase):
     Schema for creating a product. 
     Includes Shopify-specific requirements for the 2026 sync logic.
     """
-    # Required for Step C (Inventory) of the Shopify sync
     location_id: str = Field(
         description="The Shopify Global ID for the location (e.g., gid://shopify/Location/12345678)",
         examples=["gid://shopify/Location/12345678"]
     )
-    # Defaulting to 1 ensures there is stock upon creation
     quantity: int = Field(default=1, ge=0, examples=[10])
+
+
+class ProductUpdate(BaseModel):
+    """
+    Schema for updating an existing product.
+    All fields are optional to allow partial updates (PATCH style).
+    """
+    name: str | None = Field(default=None, min_length=2, max_length=255)
+    description: str | None = Field(default=None)
+    price: Decimal | None = Field(default=None, gt=0)
+    image_url: str | None = Field(default=None)
+    quantity: int | None = Field(default=None, ge=0)
 
 
 class ProductRead(ProductBase):
@@ -29,7 +39,6 @@ class ProductRead(ProductBase):
     Includes database IDs and Shopify sync confirmation.
     """
     id: int
-    # Shopify identifiers returned after successful sync
     shopify_id: str | None = None
     shopify_variant_id: str | None = None
 
