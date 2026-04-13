@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -15,16 +16,17 @@ from app.services.shopify import sync_product_to_shopify, update_shopify_product
 
 
 router = APIRouter(prefix="/products", tags=["products"])
+logger = logging.getLogger(__name__)
 
 
-router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 async def create_product(
     payload: ProductCreate,
     _: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ProductRead:
-    # 1. Local Save
+    # 1. Local Save (Initial record to get local ID)
     product = Product(
         name=payload.name,
         description=payload.description,
@@ -37,18 +39,23 @@ async def create_product(
 
     # 2. Shopify Sync
     try:
-        shopify_result = await sync_product_to_shopify(
+        shopify_data = await sync_product_to_shopify(
             name=product.name,
             price=float(product.price),
             description=product.description or "",
             quantity=payload.quantity
         )
         
-        if isinstance(shopify_result, str) and shopify_result.startswith("gid://"):
-            product.shopify_id = shopify_result
-            db.commit() # Save the GID first
+        # Check if service returned the ID dictionary successfully
+        if shopify_data and "error" not in shopify_data:
+            # Update local product with all Shopify GIDs
+            product.shopify_id = shopify_data["shopify_id"]
+            product.shopify_variant_id = shopify_data["shopify_variant_id"]
+            product.shopify_inventory_item_id = shopify_data["shopify_inventory_item_id"]
+            
+            db.commit() # Persist the IDs
 
-            # 3. Image Sync (If URL provided)
+            # 3. Image Sync (If public URL provided)
             if product.image_url:
                 await update_shopify_product_image(
                     shopify_id=product.shopify_id,
@@ -56,6 +63,8 @@ async def create_product(
                 )
             
             db.refresh(product)
+        else:
+            logger.error(f"Shopify sync returned an error: {shopify_data.get('error')}")
             
     except Exception as e:
         logger.critical(f"Shopify sync failed: {e}")
@@ -100,8 +109,8 @@ async def update_product(
             await update_shopify_product(
                 shopify_id=db_product.shopify_id,
                 name=db_product.name,
-                description=db_product.description,
-                price=float(db_product.price)
+                description=db_product.description
+                # price=float(db_product.price)
             )
             
             # Update image if it was part of this request

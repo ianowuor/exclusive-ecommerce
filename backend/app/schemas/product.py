@@ -41,5 +41,6 @@ class ProductRead(ProductBase):
     id: int
     shopify_id: str | None = None
     shopify_variant_id: str | None = None
+    shopify_inventory_item_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

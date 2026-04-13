@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import json
 import logging
+import base64
 from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from sqlalchemy.orm import Session
 from app.core.deps import get_db
@@ -13,22 +14,29 @@ logger = logging.getLogger(__name__)
 
 def verify_shopify_webhook(data: bytes, hmac_header: str) -> bool:
     """
-    Verifies the integrity of the webhook using the Shopify API Secret.
+    Verifies the integrity of the webhook using the specific Webhook Secret.
     """
     if not hmac_header:
         logger.warning("Webhook rejected: Missing HMAC header")
         return False
-        
+    
+    # Use the specific Webhook Secret, not the general API Secret
+    secret = settings.SHOPIFY_WEBHOOK_SECRET.encode("utf-8")
+    
     hash_code = hmac.new(
-        settings.SHOPIFY_API_SECRET.encode("utf-8"), 
+        secret, 
         data, 
         hashlib.sha256
     ).digest()
     
-    import base64
     calculated_hmac = base64.b64encode(hash_code).decode()
     
-    return hmac.compare_digest(calculated_hmac, hmac_header)
+    is_valid = hmac.compare_digest(calculated_hmac, hmac_header)
+    
+    if not is_valid:
+        logger.warning(f"Webhook HMAC mismatch. Calculated: {calculated_hmac} | Received: {hmac_header}")
+        
+    return is_valid
 
 @router.post("/shopify/product-update")
 async def shopify_product_update_webhook(
@@ -95,4 +103,27 @@ async def shopify_product_delete_webhook(
 
     db.delete(product)
     db.commit()
+    return {"status": "success"}
+
+
+@router.post("/shopify/inventory-update")
+async def shopify_inventory_update_webhook(
+    request: Request,
+    db: Session = Depends(get_db),
+    x_shopify_hmac_sha256: str = Header(None)
+):
+    raw_body = await request.body()
+    if not verify_shopify_webhook(raw_body, x_shopify_hmac_sha256):
+        raise HTTPException(status_code=401)
+
+    data = json.loads(raw_body)
+    inventory_item_id = f"gid://shopify/InventoryItem/{data.get('inventory_item_id')}"
+    new_quantity = data.get("available") # 'available' represents sellable stock
+
+    product = db.query(Product).filter(Product.shopify_inventory_item_id == inventory_item_id).first()
+    if product:
+        product.quantity = new_quantity
+        db.commit()
+        logger.info(f"Inventory synced: Product {product.id} now has {new_quantity} items.")
+
     return {"status": "success"}

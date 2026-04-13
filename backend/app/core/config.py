@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SHOPIFY_API_SECRET: str
     SHOPIFY_LOCATION_ID: str
     SHOPIFY_API_VERSION: str = "2025-01"
+    SHOPIFY_WEBHOOK_SECRET: str
 
     jwt_secret_key: str = Field("change_me_super_secret", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")

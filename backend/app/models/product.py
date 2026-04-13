@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
-
 class Product(Base):
     __tablename__ = "products"
 
@@ -14,8 +13,9 @@ class Product(Base):
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     
     # --- Shopify Integration Fields ---
-    # Stored as Strings because Shopify IDs are GIDs (e.g., "gid://shopify/Product/123")
     shopify_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     shopify_variant_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    # Fixed: Using Mapped style
+    shopify_inventory_item_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     cart_items: Mapped[list["CartItem"]] = relationship(back_populates="product")
