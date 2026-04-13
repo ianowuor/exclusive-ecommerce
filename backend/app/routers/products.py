@@ -82,6 +82,28 @@ async def get_products(
     return products
 
 
+@router.get("/{product_id}", response_model=ProductRead)
+async def get_product(
+    product_id: int,
+    db: Session = Depends(get_db)
+) -> ProductRead:
+    """
+    Retrieve a specific product by its local database ID.
+    """
+    # 1. Query the database
+    query = select(Product).where(Product.id == product_id)
+    product = db.scalar(query)
+
+    # 2. Check if product exists
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with ID {product_id} not found"
+        )
+
+    return product
+
+
 @router.put("/{product_id}", response_model=ProductRead)
 async def update_product(
     product_id: int,
